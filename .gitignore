@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+downloaded_files/
+trial_browser_profile/
+browser_profiles/
+results/
+*.csv
