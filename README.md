@@ -53,7 +53,8 @@ others use `browser_profiles/<market>`.
 ## Find your results
 
 - CSV: `results/shopee_<searchterm>_<date>.csv`
-- WebP screenshots: `results/screenshots/<searchterm>/<date>/<searchterm>_<date>_<listing_index>_<image_index>.webp`
+- Listing folders: `results/screenshots/<searchterm>/<date>/<searchterm>_<date>_<listing_index>/`
+- WebP screenshots inside each listing folder: `<searchterm>_<date>_<listing_index>_<image_index>.webp`
 - Extraction errors: `failures.json` in the screenshots folder.
 
 The date includes time to separate runs. Missing CSV values stay blank.

@@ -110,7 +110,10 @@ def save_diagnostic(sb, directory, name):
             mycdp.page.capture_screenshot(format_='webp', quality=90,
                                          capture_beyond_viewport=False)))
         prefix = f'{directory.parent.name}_{directory.name}'
-        (directory / f'{prefix}_{name}.webp').write_bytes(base64.b64decode(data))
+        listing_index = name.split('_', 1)[0]
+        listing_directory = directory / f'{prefix}_{listing_index}'
+        listing_directory.mkdir(parents=True, exist_ok=True)
+        (listing_directory / f'{prefix}_{name}.webp').write_bytes(base64.b64decode(data))
     except Exception as error:
         print(f'Could not save diagnostics: {error}', file=sys.stderr)
 
