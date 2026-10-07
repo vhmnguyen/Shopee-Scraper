@@ -18,6 +18,8 @@ python -m venv .venv
 
 Complete login and verification in the Chrome window if prompted. Collection
 starts automatically, and Chrome closes when finished. Run one scraper at a time.
+Chrome opens maximized (with the normal title bar) for larger screenshots. Each gallery image is displayed
+at viewport size and saved as WebP, in addition to a listing screenshot.
 Press Ctrl+C to stop.
 
 ## Options
@@ -51,11 +53,11 @@ others use `browser_profiles/<market>`.
 ## Find your results
 
 - CSV: `results/shopee_<searchterm>_<date>.csv`
-- WebP screenshots: `results/screenshots/<searchterm>/<date>/<searchterm>_<date>_<index>.webp`
+- WebP screenshots: `results/screenshots/<searchterm>/<date>/<searchterm>_<date>_<listing_index>_<image_index>.webp`
 - Extraction errors: `failures.json` in the screenshots folder.
 
 The date includes time to separate runs. Missing CSV values stay blank.
+Gallery image indices start at `1`; image index `0` is the listing screenshot.
 If Shopee blocks access, the scraper stops. Check the terminal and screenshots.
 If Chrome opens empty or cannot connect, close the leftover scraper Chrome
 window before retrying.
-

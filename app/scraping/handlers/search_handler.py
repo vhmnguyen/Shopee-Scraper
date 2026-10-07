@@ -1,4 +1,5 @@
-# app/scraping/handlers/search_handler.py
+import time
+from urllib.parse import urlparse, parse_qs
 
 class SearchHandler:
     """
@@ -10,18 +11,26 @@ class SearchHandler:
     def search(self, sb):
         print(f"[INFO] Searching for keyword: {self.keyword}")
         try:
-            sb.cdp.focus("input.shopee-searchbar-input__input")
-            sb.sleep(0.5)
-            sb.cdp.press_keys("input.shopee-searchbar-input__input", self.keyword)
-            sb.sleep(1)
-            print("[INFO] Successfully entered search keyword.")
+            # Clear prior text and submit with Enter. Desktop mouse coordinates
+            # can miss the button after a window resize or display scaling.
+            sb.cdp.type("input.shopee-searchbar-input__input", self.keyword + '\n')
+            print("[INFO] Submitted search keyword.")
         except Exception as e:
             raise RuntimeError(f"[ERROR] Failed to enter search keyword: {e}")
 
         try:
-            sb.cdp.mouse_click("button.btn.btn-solid-primary.btn--s.btn--inline.shopee-searchbar__search-button")
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline:
+                current = urlparse(sb.cdp.get_current_url())
+                if current.path.rstrip('/') == '/search' and parse_qs(current.query).get('keyword') == [self.keyword]:
+                    break
+                if any(part in current.path for part in ('/verify', '/captcha', '/buyer/login')):
+                    raise RuntimeError('Shopee redirected search to login or verification.')
+                sb.sleep(0.5)
+            else:
+                raise RuntimeError('Search did not navigate after pressing Enter within 30 seconds.')
             sb.sleep(2)
-            print("[INFO] Successfully clicked search button.")
+            print("[INFO] Search results opened.")
         except Exception as e:
             raise RuntimeError(f"[ERROR] Failed to click search button: {e}")
 

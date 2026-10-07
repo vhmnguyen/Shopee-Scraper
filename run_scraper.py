@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 from app.scraping.csv_output import FIELDS, extract_csv_row
 from app.scraping.handlers.search_handler import SearchHandler
 from app.scraping.prices import read_price
+from app.scraping.gallery import discover_gallery, show_gallery_image, image_loaded, hide_gallery
 
 ROOT = Path(__file__).resolve().parent
 MARKETS = {
@@ -56,6 +57,8 @@ def check_access(sb, allow_pending=False):
 
 def login(sb, timeout, domain):
     sb.activate_cdp_mode(f'https://{domain}/buyer/login')
+    sb.cdp.maximize()
+    sb.sleep(1)
     print('Complete login and verification in Chrome. Collection will start automatically.', flush=True)
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -112,6 +115,26 @@ def save_diagnostic(sb, directory, name):
         print(f'Could not save diagnostics: {error}', file=sys.stderr)
 
 
+def save_gallery(sb, directory, number):
+    images = discover_gallery(sb)
+    if not images:
+        print('No gallery image URLs found; listing screenshot was saved.', flush=True)
+        return
+    try:
+        for index, url in enumerate(images, 1):
+            show_gallery_image(sb, url)
+            deadline = time.monotonic() + 20
+            while not image_loaded(sb) and time.monotonic() < deadline:
+                sb.sleep(0.5)
+            if image_loaded(sb):
+                save_diagnostic(sb, directory, f'{number:04d}_{index}')
+            else:
+                print(f'Gallery image {index}/{len(images)} did not load: {url}', file=sys.stderr)
+        print(f'Processed {len(images)} gallery images for listing {number}.', flush=True)
+    finally:
+        hide_gallery(sb)
+
+
 def collect(sb, args, handle, diagnostics):
     domain, currency = MARKETS[args.market]
     writer = csv.DictWriter(handle, fieldnames=FIELDS)
@@ -161,16 +184,20 @@ def collect(sb, args, handle, diagnostics):
                     writer.writerow(row)
                     handle.flush()
                     count += 1
-                    save_diagnostic(sb, diagnostics, f'{number:04d}')
+                    save_diagnostic(sb, diagnostics, f'{number:04d}_0')
+                    try:
+                        save_gallery(sb, diagnostics, number)
+                    except Exception as error:
+                        print(f'Gallery capture failed: {error}', file=sys.stderr)
                     print(f'[{count}/{args.limit}] {row["product_name"]}', flush=True)
                     if count == args.limit:
                         return count
                 except AccessBlocked:
-                    save_diagnostic(sb, diagnostics, f'{number:04d}')
+                    save_diagnostic(sb, diagnostics, f'{number:04d}_0')
                     raise
                 except Exception as error:
                     failures.append({'url': url, 'error': str(error)})
-                    save_diagnostic(sb, diagnostics, f'{number:04d}')
+                    save_diagnostic(sb, diagnostics, f'{number:04d}_0')
                     print(f'Product failed: {error}', file=sys.stderr)
                 sb.sleep(args.pause)
         return count
@@ -207,12 +234,13 @@ def main():
     # Exclusive creation fails before browser startup if the destination exists.
     with output.open('x', encoding='utf-8-sig', newline='') as handle:
         try:
-            with SB(uc=True, headed=True, user_data_dir=str(args.profile_dir.resolve())) as sb:
+            with SB(uc=True, headed=True, chromium_arg='--start-maximized',
+                    user_data_dir=str(args.profile_dir.resolve())) as sb:
                 try:
                     login(sb, args.login_timeout, domain)
                     count = collect(sb, args, handle, diagnostics)
                 except Exception:
-                    save_diagnostic(sb, diagnostics, '0000')
+                    save_diagnostic(sb, diagnostics, '0000_0')
                     raise
             return 0 if count == args.limit else 1
         finally:
