@@ -6,7 +6,7 @@ from pathlib import Path
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 
-FIELDS = ['url', 'product_name', 'seller', 'seller_url', 'price', 'condition',
+FIELDS = ['url', 'search_term', 'product_title', 'seller', 'seller_url', 'price', 'condition',
           'unit_weight', 'sold_count', 'stock_quantity', 'minimum_purchase',
           'category', 'pack_type', 'consumables_form', 'volume', 'ingredient',
           'circulation_number', 'description', 'date_collected']
@@ -29,7 +29,7 @@ def find_product(data):
     return {}
 
 
-def extract_csv_row(html, url, price=None):
+def extract_csv_row(html, url, price=None, search_term=''):
     soup = BeautifulSoup(html, 'html.parser')
     product = {}
     for script in soup.select('script[type="application/ld+json"]'):
@@ -40,9 +40,9 @@ def extract_csv_row(html, url, price=None):
         if product:
             break
     row = dict.fromkeys(FIELDS, '')
-    row.update(url=url, date_collected=datetime.now(timezone.utc).isoformat())
+    row.update(url=url, search_term=search_term, date_collected=datetime.now(timezone.utc).isoformat())
     heading = soup.find('h1')
-    row['product_name'] = heading.get_text(' ', strip=True) if heading else product.get('name', '')
+    row['product_title'] = heading.get_text(' ', strip=True) if heading else product.get('name', '')
     offers = product.get('offers') or {}
     if isinstance(offers, list):
         offers = offers[0] if offers else {}
@@ -97,7 +97,7 @@ def extract_csv_row(html, url, price=None):
     sold = re.search(r'([\d.,]+\s*(?:k|m|rb|ribu|jt)?\+?)\s*(?:sold|đã bán|terjual)\b', text, re.I)
     if sold:
         row['sold_count'] = sold[1].strip()
-    if not row['product_name'] or not row['price']:
+    if not row['product_title'] or not row['price']:
         raise RuntimeError('Product name or price missing; CSV row was not saved.')
     return row
 

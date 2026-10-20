@@ -183,7 +183,7 @@ def collect(sb, args, handle, diagnostics):
                         if not check_access(sb):
                             raise AccessBlocked('Product returned to login; stopping.')
                     sb.cdp.evaluate('window.scrollTo(0, 0)')
-                    row = extract_csv_row(sb.cdp.get_page_source(), url, read_price(sb, currency))
+                    row = extract_csv_row(sb.cdp.get_page_source(), url, read_price(sb, currency), search_term=args.search)
                     writer.writerow(row)
                     handle.flush()
                     count += 1
@@ -192,7 +192,7 @@ def collect(sb, args, handle, diagnostics):
                         save_gallery(sb, diagnostics, number)
                     except Exception as error:
                         print(f'Gallery capture failed: {error}', file=sys.stderr)
-                    print(f'[{count}/{args.limit}] {row["product_name"]}', flush=True)
+                    print(f'[{count}/{args.limit}] {row["product_title"]}', flush=True)
                     if count == args.limit:
                         return count
                 except AccessBlocked:
