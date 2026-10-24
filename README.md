@@ -31,7 +31,6 @@ Press Ctrl+C to stop.
 | `--limit` | `10` | Number of successful products to save |
 | `--max-pages` | `10` | Maximum search pages |
 | `--output` | Automatic | CSV path; must not already exist |
-| `--pause` | `10` | Seconds between products |
 | `--login-timeout` | `300` | Seconds allowed for login |
 | `--profile-dir` | Per region | Override Chrome profile with saved login |
 

@@ -3,7 +3,6 @@ import argparse
 import base64
 import csv
 import json
-import math
 import re
 import sys
 import time
@@ -16,6 +15,7 @@ from app.scraping.csv_output import FIELDS, extract_csv_row
 from app.scraping.handlers.search_handler import SearchHandler
 from app.scraping.prices import read_price
 from app.scraping.gallery import discover_gallery, show_gallery_image, image_loaded, hide_gallery
+from app.scraping.timing import action_wait
 
 ROOT = Path(__file__).resolve().parent
 MARKETS = {
@@ -37,13 +37,6 @@ def positive_int(value):
     return number
 
 
-def nonnegative(value):
-    number = float(value)
-    if not math.isfinite(number) or number < 0:
-        raise argparse.ArgumentTypeError('Must be finite and nonnegative')
-    return number
-
-
 def check_access(sb, allow_pending=False):
     text = sb.cdp.get_text('body').casefold()
     path = urlparse(sb.cdp.get_current_url()).path.casefold()
@@ -58,7 +51,7 @@ def check_access(sb, allow_pending=False):
 def login(sb, timeout, domain):
     sb.activate_cdp_mode(f'https://{domain}/buyer/login')
     sb.cdp.maximize()
-    sb.sleep(1)
+    action_wait(sb)
     print('Complete login and verification in Chrome. Collection will start automatically.', flush=True)
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -97,7 +90,7 @@ def collect_page(sb, seen, domain):
             raise AccessBlocked('Shopee returned to login during collection; stopping.')
         links.update(product_links(sb.cdp.get_page_source(), sb.cdp.get_current_url(), domain))
         sb.cdp.evaluate('window.scrollBy(0, window.innerHeight)')
-        sb.sleep(2)
+        action_wait(sb)
     return [(key, url) for key, url in links.items() if key not in seen]
 
 
@@ -125,6 +118,7 @@ def save_gallery(sb, directory, number):
         return
     try:
         for index, url in enumerate(images, 1):
+            action_wait(sb)
             show_gallery_image(sb, url)
             deadline = time.monotonic() + 20
             while not image_loaded(sb) and time.monotonic() < deadline:
@@ -162,7 +156,7 @@ def collect(sb, args, handle, diagnostics):
             print(f'Collecting search page {page + 1}...', flush=True)
             if page:
                 sb.cdp.get(page_url(search_url, page))
-                sb.sleep(5)
+                action_wait(sb)
             listings = collect_page(sb, seen, domain)
             if not listings:
                 print('No new product links found; collection finished.', flush=True)
@@ -173,16 +167,17 @@ def collect(sb, args, handle, diagnostics):
                 try:
                     print(f'Opening product {number}; saved {count}/{args.limit}...', flush=True)
                     sb.cdp.get(url)
-                    sb.sleep(5)
+                    action_wait(sb)
                     if not check_access(sb):
                         raise AccessBlocked('Product returned to login; stopping.')
                     # Load lower product specifications and description.
                     for _ in range(3):
                         sb.cdp.evaluate('window.scrollBy(0, window.innerHeight)')
-                        sb.sleep(2)
+                        action_wait(sb)
                         if not check_access(sb):
                             raise AccessBlocked('Product returned to login; stopping.')
                     sb.cdp.evaluate('window.scrollTo(0, 0)')
+                    action_wait(sb)
                     row = extract_csv_row(sb.cdp.get_page_source(), url, read_price(sb, currency), search_term=args.search)
                     writer.writerow(row)
                     handle.flush()
@@ -202,7 +197,7 @@ def collect(sb, args, handle, diagnostics):
                     failures.append({'url': url, 'error': str(error)})
                     save_diagnostic(sb, diagnostics, f'{number:04d}_0')
                     print(f'Product failed: {error}', file=sys.stderr)
-                sb.sleep(args.pause)
+                action_wait(sb)
         return count
     finally:
         if failures:
@@ -217,7 +212,6 @@ def main():
     parser.add_argument('--limit', type=positive_int, default=10)
     parser.add_argument('--max-pages', type=positive_int, default=10)
     parser.add_argument('--output', type=Path)
-    parser.add_argument('--pause', type=nonnegative, default=10, help='Seconds between products')
     parser.add_argument('--login-timeout', type=positive_int, default=300)
     parser.add_argument('--profile-dir', type=Path, help='Override the region-specific Chrome profile')
     args = parser.parse_args()
