@@ -1,5 +1,6 @@
 import time
 from urllib.parse import urlparse, parse_qs
+from ..timing import action_wait
 
 class SearchHandler:
     """
@@ -29,7 +30,7 @@ class SearchHandler:
                 sb.sleep(0.5)
             else:
                 raise RuntimeError('Search did not navigate after pressing Enter within 30 seconds.')
-            sb.sleep(2)
+            action_wait(sb)
             print("[INFO] Search results opened.")
         except Exception as e:
             raise RuntimeError(f"[ERROR] Failed to click search button: {e}")
