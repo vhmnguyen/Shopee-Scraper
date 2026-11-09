@@ -22,14 +22,29 @@ Chrome opens maximized (with the normal title bar) for larger screenshots. Each 
 at viewport size and saved as WebP, in addition to a listing screenshot.
 Press Ctrl+C to stop.
 
+To collect multiple search terms with separate entry targets, pass matching lists:
+
+```powershell
+.\.venv\Scripts\python.exe .\run_scraper.py --search cat dog --entries 50 40
+```
+
+This targets 50 successful entries for `cat`, then 40 for `dog`, using one browser
+session and one CSV. Each row includes its search term. Quote multiword terms,
+for example `--search "cat food" "dog food" --entries 50 40`.
+`--entries` is an alias for `--limit`. A single count applies to every term;
+otherwise the number of counts must match the number of terms. The default is
+10 entries per term. If results run out or `--max-pages` is reached, collection
+continues with the next term and the command exits with status 1 for the shortfall.
+Access or verification blocks still stop the run.
+
 ## Options
 
 | Option | Default | Use |
 | --- | --- | --- |
-| `--search` | Required | Search term |
+| `--search` | Required | One or more search terms |
 | `--market` | `vn` | Shopee region code (vn, id, ph, etc.) |
-| `--limit` | `10` | Number of successful products to save |
-| `--max-pages` | `10` | Maximum search pages |
+| `--limit`, `--entries` | `10` | Successful products per term; one shared count or matching counts |
+| `--max-pages` | `10` | Maximum search pages per term |
 | `--output` | Automatic | CSV path; must not already exist |
 | `--login-timeout` | `300` | Seconds allowed for login |
 | `--profile-dir` | Per region | Override Chrome profile with saved login |
@@ -55,6 +70,9 @@ others use `browser_profiles/<market>`.
 - Listing folders: `results/screenshots/<searchterm>/<date>/<searchterm>_<date>_<listing_index>/`
 - WebP screenshots inside each listing folder: `<searchterm>_<date>_<listing_index>_<image_index>.webp`
 - Extraction errors: `failures.json` in the screenshots folder.
+
+Multi-term runs use `shopee_batch_<date>.csv`. Screenshots keep the default
+folder structure for each term: `results/screenshots/<searchterm>/<date>/`.
 
 The date includes time to separate runs. Missing CSV values stay blank.
 Gallery image indices start at `1`; image index `0` is the listing screenshot.

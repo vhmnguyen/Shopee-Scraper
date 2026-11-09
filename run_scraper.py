@@ -132,10 +132,11 @@ def save_gallery(sb, directory, number):
         hide_gallery(sb)
 
 
-def collect(sb, args, handle, diagnostics):
+def collect(sb, args, handle, diagnostics, write_header=True):
     domain, currency = MARKETS[args.market]
     writer = csv.DictWriter(handle, fieldnames=FIELDS)
-    writer.writeheader()
+    if write_header:
+        writer.writeheader()
     handle.flush()
     count = 0
     seen = set()
@@ -207,9 +208,10 @@ def collect(sb, args, handle, diagnostics):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--search', required=True)
+    parser.add_argument('--search', required=True, nargs='+', help='Search terms, in order; quote terms containing spaces')
     parser.add_argument('--market', choices=MARKETS, default='vn', help='Shopee region (default: vn)')
-    parser.add_argument('--limit', type=positive_int, default=10)
+    parser.add_argument('--limit', '--entries', dest='limit', type=positive_int, nargs='+', default=[10],
+                        help='Successful entries per search: one shared count or one count per term (default: 10)')
     parser.add_argument('--max-pages', type=positive_int, default=10)
     parser.add_argument('--output', type=Path)
     parser.add_argument('--login-timeout', type=positive_int, default=300)
@@ -219,11 +221,16 @@ def main():
     if args.profile_dir is None:
         args.profile_dir = (ROOT / 'trial_browser_profile' if args.market == 'vn'
                             else ROOT / 'browser_profiles' / args.market)
-    if not args.search.strip():
+    if any(not term.strip() for term in args.search):
         parser.error('--search must not be blank')
+    if len(args.limit) not in (1, len(args.search)):
+        parser.error('--entries/--limit must contain one count or one count per search term')
+    limits = args.limit * len(args.search) if len(args.limit) == 1 else args.limit
+    searches = list(zip(args.search, limits))
     stamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S_%f')
-    term = re.sub(r'[^\w-]+', '_', args.search).strip('_') or 'search'
-    output = args.output or ROOT / 'results' / f'shopee_{term}_{stamp}.csv'
+    term = re.sub(r'[^\w-]+', '_', args.search[0]).strip('_') or 'search'
+    output_term = 'batch' if len(searches) > 1 else term
+    output = args.output or ROOT / 'results' / f'shopee_{output_term}_{stamp}.csv'
     output.parent.mkdir(parents=True, exist_ok=True)
     diagnostics = ROOT / 'results' / 'screenshots' / term / stamp
     diagnostics.mkdir(parents=True, exist_ok=True)
@@ -235,11 +242,24 @@ def main():
                     user_data_dir=str(args.profile_dir.resolve())) as sb:
                 try:
                     login(sb, args.login_timeout, domain)
-                    count = collect(sb, args, handle, diagnostics)
+                    complete = True
+                    for index, (search, limit) in enumerate(searches):
+                        search_args = argparse.Namespace(**vars(args))
+                        search_args.search = search
+                        search_args.limit = limit
+                        if index:
+                            search_name = re.sub(r'[^\w-]+', '_', search).strip('_') or 'search'
+                            search_stamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S_%f')
+                            diagnostics = ROOT / 'results' / 'screenshots' / search_name / search_stamp
+                            diagnostics.mkdir(parents=True, exist_ok=True)
+                        print(f'Search {index + 1}/{len(searches)}: {search!r}; target {limit} entries.', flush=True)
+                        print(f'Diagnostics: {diagnostics}', flush=True)
+                        count = collect(sb, search_args, handle, diagnostics, write_header=index == 0)
+                        complete = complete and count == limit
                 except Exception:
                     save_diagnostic(sb, diagnostics, '0000_0')
                     raise
-            return 0 if count == args.limit else 1
+            return 0 if complete else 1
         finally:
             print(f'CSV: {output.resolve()}\nDiagnostics: {diagnostics}', flush=True)
 
